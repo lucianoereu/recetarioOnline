@@ -539,11 +539,12 @@
 
     </script>
     <!-- LÓGICA DE IA GENERATIVA -->
-     <script type="module">
+ <script type="module">
   import { GoogleGenerativeAI } from "@google/generative-ai";
 
   // 1. CONFIGURACIÓN
-  const API_KEY = "AIzaSyB4dm80jUYLPABDVkM6Bp2InJS5t-OjCx8"; 
+  // Asegúrate de que esta API Key sea la de Google AI Studio (la que empieza con AIza...)
+  const API_KEY = "TU_API_KEY_DE_GEMINI_AQUI"; 
   const genAI = new GoogleGenerativeAI(API_KEY);
 
   // 2. REFERENCIAS AL DOM
@@ -555,31 +556,37 @@
   // 3. FUNCIÓN PRINCIPAL
   btnIA.addEventListener('click', async () => {
     
-    // Obtener datos de la pantalla actual
-    // (Asumimos que tienes inputs con clase 'ingrediente' o similar, ajusta si es necesario)
-    // Aquí intento leer lo que el usuario escribió:
-    const nombrePlatoInput = document.querySelector('input[placeholder="Nombre del Plato"]'); 
-    // Nota: Ajusta el selector de arriba si tu input tiene otro ID o clase
+    // A) Obtener Nombre del Plato (Usando tu ID correcto)
+    const nombrePlatoInput = document.getElementById('recipeName');
+    const nombrePlato = nombrePlatoInput.value.trim() || "Plato Sorpresa";
     
-    const nombrePlato = nombrePlatoInput ? nombrePlatoInput.value : "Plato Sorpresa";
-    
-    // Recolectar ingredientes (ajusta este selector según cómo hayas hecho tu lista)
-    const inputsIngredientes = document.querySelectorAll('input'); 
-    let ingredientes = [];
-    inputsIngredientes.forEach(inp => {
-        if(inp.value && inp.type === "text" && inp.placeholder !== "Nombre del Plato") {
-            ingredientes.push(inp.value);
+    // B) Recolectar Ingredientes (Usando tus clases específicas)
+    // Buscamos cada fila y extraemos nombre, cantidad y unidad
+    const filasIngredientes = document.querySelectorAll('.ingredient-row');
+    let listaIngredientes = [];
+
+    filasIngredientes.forEach(fila => {
+        const nombre = fila.querySelector('.ing-name').value.trim();
+        const cantidad = fila.querySelector('.ing-qty').value.trim();
+        const unidad = fila.querySelector('.ing-unit').value.trim();
+
+        // Solo agregamos si tiene nombre
+        if(nombre) {
+            // Formato legible para la IA: "200 gr de Harina"
+            listaIngredientes.push(`${cantidad} ${unidad} de ${nombre}`);
         }
     });
 
-    if (ingredientes.length === 0) {
+    if (listaIngredientes.length === 0) {
         alert("¡Agrega al menos un ingrediente para que el chef pueda trabajar!");
         return;
     }
 
-    // UI: Mostrar cargando
-    btnIA.textContent = "🍳 Cocinando ideas...";
+    // UI: Mostrar estado de carga
+    const textoOriginal = btnIA.textContent;
+    btnIA.textContent = "🍳 El Chef está pensando...";
     btnIA.disabled = true;
+    btnIA.style.opacity = "0.7";
     resultadoIA.style.display = 'none';
 
     try {
@@ -587,17 +594,22 @@
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const prompt = `
-        Actúa como un chef experto. 
-        Plato: "${nombrePlato}".
-        Ingredientes disponibles: ${ingredientes.join(", ")}.
+        Actúa como un chef experto y amigable. 
+        Voy a cocinar: "${nombrePlato}".
         
-        Genera una respuesta SOLO en formato JSON válido con esta estructura:
+        Tengo estos ingredientes exactos: 
+        ${listaIngredientes.join(", ")}.
+        
+        Por favor genera:
+        1. Un procedimiento paso a paso numerado (lógico y claro).
+        2. Tres "secretos" o tips cortos (trucos de sabor, técnica o emplatado).
+
+        IMPORTANTE: Devuelve la respuesta SOLO en formato JSON puro, sin bloques de código markdown, con esta estructura exacta:
         {
-          "pasos": ["Paso 1 detallado", "Paso 2 detallado"],
+          "pasos": ["Paso 1...", "Paso 2..."],
           "tips": [
-            {"titulo": "Truco", "contenido": "Texto breve"},
-            {"titulo": "Sabor", "contenido": "Texto breve"},
-            {"titulo": "Presentación", "contenido": "Texto breve"}
+            {"titulo": "TITULO CORTO", "contenido": "Consejo breve..."},
+            {"titulo": "TITULO CORTO", "contenido": "Consejo breve..."}
           ]
         }
       `;
@@ -607,8 +619,9 @@
       const response = await result.response;
       let text = response.text();
       
-      // Limpiar formato JSON
+      // Limpieza robusta del JSON (quita ```json y ```)
       text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      
       const data = JSON.parse(text);
 
       // 6. MOSTRAR RESULTADOS
@@ -620,26 +633,37 @@
       data.pasos.forEach(paso => {
           const li = document.createElement('li');
           li.textContent = paso;
-          li.style.marginBottom = "10px";
+          li.className = "mb-2 text-gray-700 font-serif text-lg"; // Un poco de estilo Tailwind
           listaPasos.appendChild(li);
       });
 
-      // Renderizar Tips (Estilo Tarjetas/Slides)
+      // Renderizar Tips (Estilo Post-it mejorado)
       data.tips.forEach(tip => {
           const div = document.createElement('div');
-          div.style = "min-width: 200px; background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba; color: #856404;";
-          div.innerHTML = `<strong>${tip.titulo}</strong><p style='margin: 5px 0 0 0; font-size: 0.9em;'>${tip.contenido}</p>`;
+          // Estilos inline para asegurar que se vean bien las tarjetas
+          div.className = "flex-shrink-0 w-64 p-4 rounded-lg shadow-md transform hover:-translate-y-1 transition-transform duration-200";
+          div.style.backgroundColor = "#fffef0"; // Color papel
+          div.style.border = "1px solid #e2e8f0";
+          
+          div.innerHTML = `
+            <div class="font-bold text-red-500 mb-2 border-b border-red-200 pb-1">📌 ${tip.titulo}</div>
+            <p class="text-gray-600 text-sm leading-relaxed">${tip.contenido}</p>
+          `;
           contenedorTips.appendChild(div);
       });
 
       resultadoIA.style.display = 'block';
+      // Auto-scroll suave hacia el resultado
+      resultadoIA.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     } catch (error) {
-      console.error(error);
-      alert("El chef se quemó la mano (Hubo un error). Revisa la consola.");
+      console.error("Error IA:", error);
+      alert("El chef tuvo un problema técnico. Revisa la consola (F12) para ver el detalle.");
     } finally {
-      btnIA.textContent = "✨ Generar Procedimiento y Tips con IA";
+      // Restaurar botón
+      btnIA.textContent = textoOriginal;
       btnIA.disabled = false;
+      btnIA.style.opacity = "1";
     }
   });
 </script>
