@@ -1,128 +1,588 @@
-<script type="module">
-  import { GoogleGenerativeAI } from "@google/generative-ai";
-
-  // 1. CONFIGURACIÓN
-  // Asegúrate de que esta API Key sea la de Google AI Studio (la que empieza con AIza...)
-  const API_KEY = "TU_API_KEY_DE_GEMINI_AQUI"; 
-  const genAI = new GoogleGenerativeAI(API_KEY);
-
-  // 2. REFERENCIAS AL DOM
-  const btnIA = document.getElementById('btnIA');
-  const resultadoIA = document.getElementById('resultadoIA');
-  const listaPasos = document.getElementById('listaPasos');
-  const contenedorTips = document.getElementById('contenedorTips');
-
-  // 3. FUNCIÓN PRINCIPAL
-  btnIA.addEventListener('click', async () => {
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Cuaderno de Recetas Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
     
-    // A) Obtener Nombre del Plato (Usando tu ID correcto)
-    const nombrePlatoInput = document.getElementById('recipeName');
-    const nombrePlato = nombrePlatoInput.value.trim() || "Plato Sorpresa";
-    
-    // B) Recolectar Ingredientes (Usando tus clases específicas)
-    // Buscamos cada fila y extraemos nombre, cantidad y unidad
-    const filasIngredientes = document.querySelectorAll('.ingredient-row');
-    let listaIngredientes = [];
-
-    filasIngredientes.forEach(fila => {
-        const nombre = fila.querySelector('.ing-name').value.trim();
-        const cantidad = fila.querySelector('.ing-qty').value.trim();
-        const unidad = fila.querySelector('.ing-unit').value.trim();
-
-        // Solo agregamos si tiene nombre
-        if(nombre) {
-            // Formato legible para la IA: "200 gr de Harina"
-            listaIngredientes.push(`${cantidad} ${unidad} de ${nombre}`);
+    <style>
+        /* --- ESTILOS VISUALES --- */
+        body {
+            background-color: #333;
+            background-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
+            font-family: 'Kalam', cursive;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            min-height: 100vh;
+            color: #2d3748;
         }
-    });
 
-    if (listaIngredientes.length === 0) {
-        alert("¡Agrega al menos un ingrediente para que el chef pueda trabajar!");
-        return;
-    }
-
-    // UI: Mostrar estado de carga
-    const textoOriginal = btnIA.textContent;
-    btnIA.textContent = "🍳 El Chef está pensando...";
-    btnIA.disabled = true;
-    btnIA.style.opacity = "0.7";
-    resultadoIA.style.display = 'none';
-
-    try {
-      // 4. PREPARAR EL MODELO
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-      const prompt = `
-        Actúa como un chef experto y amigable. 
-        Voy a cocinar: "${nombrePlato}".
-        
-        Tengo estos ingredientes exactos: 
-        ${listaIngredientes.join(", ")}.
-        
-        Por favor genera:
-        1. Un procedimiento paso a paso numerado (lógico y claro).
-        2. Tres "secretos" o tips cortos (trucos de sabor, técnica o emplatado).
-
-        IMPORTANTE: Devuelve la respuesta SOLO en formato JSON puro, sin bloques de código markdown, con esta estructura exacta:
-        {
-          "pasos": ["Paso 1...", "Paso 2..."],
-          "tips": [
-            {"titulo": "TITULO CORTO", "contenido": "Consejo breve..."},
-            {"titulo": "TITULO CORTO", "contenido": "Consejo breve..."}
-          ]
+        .notebook-sheet {
+            background-color: #fffef0;
+            width: 100%;
+            max-width: 900px;
+            min-height: 800px;
+            padding: 40px 40px 40px 60px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3), 0 0 40px rgba(0,0,0,0.1) inset;
+            position: relative;
+            background-image: linear-gradient(#e2e2e2 1px, transparent 1px);
+            background-size: 100% 30px;
+            border-radius: 2px;
         }
-      `;
 
-      // 5. LLAMADA A LA IA
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      let text = response.text();
-      
-      // Limpieza robusta del JSON (quita ```json y ```)
-      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-      
-      const data = JSON.parse(text);
+        .notebook-sheet::before {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0; left: 40px; width: 2px;
+            background-color: #ef4444; opacity: 0.6;
+        }
 
-      // 6. MOSTRAR RESULTADOS
-      // Limpiar anteriores
-      listaPasos.innerHTML = "";
-      contenedorTips.innerHTML = "";
+        .notebook-sheet::after {
+            content: '';
+            position: absolute;
+            top: 40px; left: 15px; width: 15px; height: 15px;
+            background: #333; border-radius: 50%;
+            box-shadow: 0 300px 0 #333, 0 600px 0 #333;
+        }
 
-      // Renderizar Pasos
-      data.pasos.forEach(paso => {
-          const li = document.createElement('li');
-          li.textContent = paso;
-          li.className = "mb-2 text-gray-700 font-serif text-lg"; // Un poco de estilo Tailwind
-          listaPasos.appendChild(li);
-      });
+        input, select {
+            background: transparent;
+            border: none;
+            border-bottom: 2px dashed #a0aec0;
+            font-family: 'Kalam', cursive;
+            font-size: 1.1rem;
+            color: #1a202c;
+            outline: none;
+            transition: border-color 0.2s;
+            padding: 0 5px;
+        }
 
-      // Renderizar Tips (Estilo Post-it mejorado)
-      data.tips.forEach(tip => {
-          const div = document.createElement('div');
-          // Estilos inline para asegurar que se vean bien las tarjetas
-          div.className = "flex-shrink-0 w-64 p-4 rounded-lg shadow-md transform hover:-translate-y-1 transition-transform duration-200";
-          div.style.backgroundColor = "#fffef0"; // Color papel
-          div.style.border = "1px solid #e2e8f0";
-          
-          div.innerHTML = `
-            <div class="font-bold text-red-500 mb-2 border-b border-red-200 pb-1">📌 ${tip.titulo}</div>
-            <p class="text-gray-600 text-sm leading-relaxed">${tip.contenido}</p>
-          `;
-          contenedorTips.appendChild(div);
-      });
+        input:focus {
+            border-bottom: 2px solid #4a5568;
+            background-color: rgba(255, 255, 255, 0.4);
+        }
 
-      resultadoIA.style.display = 'block';
-      // Auto-scroll suave hacia el resultado
-      resultadoIA.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        .btn-paper {
+            font-family: 'Kalam', cursive;
+            font-weight: 700;
+            border: 2px solid #2d3748;
+            background: white;
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.2);
+            transform: rotate(-1deg);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
 
-    } catch (error) {
-      console.error("Error IA:", error);
-      alert("El chef tuvo un problema técnico. Revisa la consola (F12) para ver el detalle.");
-    } finally {
-      // Restaurar botón
-      btnIA.textContent = textoOriginal;
-      btnIA.disabled = false;
-      btnIA.style.opacity = "1";
-    }
-  });
-</script>
+        .btn-paper:hover {
+            transform: rotate(0deg) scale(1.02);
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+        }
+        
+        .btn-paper:active {
+            transform: translateY(2px);
+            box-shadow: 0px 0px 0px rgba(0,0,0,0.2);
+        }
+
+        .saved-recipes-card {
+            background-color: #fff740;
+            transform: rotate(2deg);
+            box-shadow: 4px 4px 8px rgba(0,0,0,0.2);
+            border: none;
+        }
+        
+        /* Estilos para el Login */
+        .login-overlay {
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(2px);
+        }
+        
+        .google-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-family: 'Inter', sans-serif;
+            font-weight: bold;
+            color: #444;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .google-btn:hover {
+            background-color: #f8f8f8;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+        }
+
+        .user-chip {
+            background-color: #e2e8f0;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #cbd5e0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="notebook-sheet relative">
+        
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b-2 border-gray-300 pb-2">
+            <h1 class="text-4xl font-bold text-gray-800" style="text-decoration: underline; text-decoration-style: wavy; text-decoration-color: #ef4444;">
+                Mis Recetas
+            </h1>
+            
+            <div id="userSection" class="mt-2 md:mt-0 flex items-center gap-2 hidden">
+                <div class="user-chip">
+                    <span class="material-symbols-outlined text-gray-600 text-sm">person</span>
+                    <span id="userNameDisplay">Usuario</span>
+                </div>
+                <button onclick="window.logout()" class="text-xs text-red-500 hover:text-red-700 underline">Salir</button>
+            </div>
+            <button id="loginBtnTop" onclick="window.loginWithGoogle()" class="mt-2 md:mt-0 btn-paper px-4 py-1 text-sm bg-blue-50 text-blue-600 hidden">
+                Iniciar Sesión
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-2 space-y-6">
+                <div class="w-full">
+                    <label class="block text-lg font-bold text-gray-600 mb-1">Nombre del Plato:</label>
+                    <input type="text" id="recipeName" class="w-full text-2xl font-bold" placeholder="Ej. Lasaña de la Tía">
+                </div>
+
+                <div class="flex flex-wrap gap-6 bg-yellow-50 p-4 rounded-lg border border-dashed border-yellow-200 transform -rotate-1">
+                    <div>
+                        <label class="block text-gray-600 font-bold">Rinde para:</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="baseServings" value="4" class="w-20 text-center font-bold text-xl" min="1">
+                            <span class="text-lg">personas</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-indigo-600 font-bold">Quiero cocinar para:</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="targetServings" value="8" class="w-20 text-center font-bold text-xl text-indigo-700" min="1">
+                            <span class="text-lg text-indigo-700">personas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-2xl font-bold text-gray-700">Ingredientes:</h2>
+                    </div>
+                    <div id="ingredientsContainer" class="space-y-3 mb-4">
+                        </div>
+                    <button onclick="window.addIngredientRow()" class="text-gray-500 hover:text-gray-800 text-lg flex items-center gap-1 transition-colors">
+                        <span>+</span> <span>Agregar otro renglón</span>
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap gap-4 pt-4 border-t-2 border-gray-300 border-dashed">
+                    <button onclick="window.calculate()" class="btn-paper px-6 py-2 text-indigo-600 rounded-lg text-xl">
+                        Calcular
+                    </button>
+                    <button onclick="window.saveCurrentRecipe()" class="btn-paper px-6 py-2 text-green-600 rounded-lg text-xl">
+                        Guardar Receta
+                    </button>
+                    <button onclick="window.clearForm()" class="btn-paper px-4 py-2 text-gray-500 rounded-lg text-lg text-sm ml-auto">
+                        Nueva Hoja
+                    </button>
+                </div>
+
+                <hr style="border-top: 2px dashed #ccc; margin: 30px 0;">
+                
+                <div style="text-align: center;">
+                    <button id="btnIA" class="btn-paper" style="background-color: #6f42c1; color: white; padding: 12px 24px; border: none; font-size: 1.1rem; transform: rotate(0deg);">
+                        ✨ Generar Procedimiento con IA
+                    </button>
+                </div>
+
+                <div id="resultadoIA" style="display: none; margin-top: 25px; border: 2px solid #ddd; padding: 25px; border-radius: 10px; background: #fff;">
+                    <h3 style="color: #333; font-weight: bold; font-size: 1.5rem; margin-bottom: 15px;">👨‍🍳 Procedimiento Sugerido:</h3>
+                    <ol id="listaPasos" style="text-align: left; margin-bottom: 25px; list-style-position: inside;"></ol>
+                    
+                    <h3 style="color: #333; font-weight: bold; font-size: 1.5rem; margin-bottom: 15px;">💡 Secretos del Chef:</h3>
+                    <div id="contenedorTips" style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px;">
+                        </div>
+                </div>
+
+                <div id="calculationResult" class="hidden mt-6 p-6 bg-white border-2 border-gray-800 rounded-lg shadow-lg relative transform rotate-1">
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-3 py-1 text-sm font-bold rounded rotate-1">
+                        RESULTADO
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-center" id="resultTitle">Necesitas:</h3>
+                    <ul id="resultList" class="list-disc pl-6 text-lg space-y-1"></ul>
+                </div>
+            </div>
+
+            <div class="lg:col-span-1">
+                <div class="saved-recipes-card p-5 relative">
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 w-4 h-4 rounded-full bg-red-500 shadow-sm border border-red-700 z-10"></div>
+                    <h3 class="text-xl font-bold text-gray-800 text-center">Índice</h3>
+                    <p class="text-sm text-gray-600 text-center mb-4 italic">Tus notas guardadas</p>
+                    
+                    <div id="savedRecipesList" class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                        <div class="text-center text-gray-500 py-4 text-sm">
+                            Inicia sesión para ver<br>tu cuaderno.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loginOverlay" class="fixed inset-0 login-overlay flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-2xl max-w-md w-full border-4 border-gray-800 transform rotate-1">
+                <h2 class="text-3xl font-bold text-center mb-2">¡Bienvenido!</h2>
+                <p class="text-gray-600 text-center mb-6">Para guardar tus recetas y no perderlas nunca, inicia sesión.</p>
+                
+                <div id="configWarning" class="hidden bg-red-100 p-3 rounded text-xs text-red-800 mb-4 border border-red-200">
+                    <strong>Falta Configuración:</strong> Edita el archivo HTML y pega tus credenciales de Firebase en la sección marcada.
+                </div>
+
+                <button onclick="window.loginWithGoogle()" class="google-btn w-full justify-center text-lg py-3">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6">
+                    Entrar con Google
+                </button>
+                
+                <button onclick="window.closeLoginModal()" class="block w-full text-center mt-4 text-gray-500 text-sm hover:underline">
+                    Solo quiero probar (Modo Invitado)
+                </button>
+            </div>
+        </div>
+
+        <div id="messageOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded shadow-xl max-w-sm w-full transform -rotate-1 border-2 border-gray-800">
+                <p id="messageText" class="text-xl text-center font-bold mb-4"></p>
+                <button onclick="document.getElementById('messageOverlay').classList.add('hidden')" class="btn-paper w-full py-2 bg-gray-100 hover:bg-gray-200">Cerrar</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // TUS CREDENCIALES (NO TOCAR)
+        let firebaseConfig = {
+            apiKey: "AIzaSyBOWnp0mhttmLzBzyA3_E3TlPBpW0SXNGY",
+            authDomain: "recetarioapp-bfef4.firebaseapp.com",
+            projectId: "recetarioapp-bfef4",
+            storageBucket: "recetarioapp-bfef4.firebasestorage.app",
+            messagingSenderId: "457281577350",
+            appId: "1:457281577350:web:96c37f7369334d44864c07",
+            measurementId: "G-CR481S5QNR"
+         };
+
+        // Inicializar App
+        let app, auth, db, provider;
+        let isConfigured = false;
+
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            provider = new GoogleAuthProvider();
+            isConfigured = true;
+        } catch (e) {
+            console.warn("Esperando configuración de Firebase...");
+            document.getElementById('configWarning').classList.remove('hidden');
+        }
+
+        // --- AUTH ---
+        let currentUser = null;
+        let unsubscribeRecipes = null;
+
+        window.loginWithGoogle = async () => {
+            if (!isConfigured) return;
+            try {
+                await signInWithPopup(auth, provider);
+                document.getElementById('loginOverlay').classList.add('hidden');
+            } catch (error) {
+                console.error(error);
+                alert("Error al iniciar sesión: " + error.message);
+            }
+        };
+
+        window.logout = async () => {
+            await signOut(auth);
+            location.reload(); 
+        };
+
+        window.closeLoginModal = () => {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            if (isConfigured && !currentUser) {
+                signInAnonymously(auth).catch(e => console.error(e));
+            }
+        };
+
+        if (isConfigured) {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('loginOverlay').classList.add('hidden');
+                    document.getElementById('loginBtnTop').classList.add('hidden');
+                    document.getElementById('userSection').classList.remove('hidden');
+                    document.getElementById('userNameDisplay').textContent = user.displayName || 'Invitado';
+                    loadUserRecipes(user.uid);
+                } else {
+                    currentUser = null;
+                    document.getElementById('loginOverlay').classList.remove('hidden');
+                    document.getElementById('userSection').classList.add('hidden');
+                    document.getElementById('savedRecipesList').innerHTML = '<div class="text-center p-4 text-gray-500">Esperando usuario...</div>';
+                }
+            });
+        } else {
+             document.getElementById('loginOverlay').classList.remove('hidden');
+        }
+
+        // --- FIRESTORE ---
+        function loadUserRecipes(userId) {
+            if (unsubscribeRecipes) unsubscribeRecipes();
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'recetario-web';
+            const colRef = collection(db, 'artifacts', appId, 'users', userId, 'recipes');
+            
+            unsubscribeRecipes = onSnapshot(colRef, (snapshot) => {
+                const list = document.getElementById('savedRecipesList');
+                list.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    list.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm">Cuaderno vacío.<br>¡Guarda algo rico!</div>';
+                    return;
+                }
+
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const el = document.createElement('div');
+                    el.className = "flex justify-between items-center bg-white p-2 rounded shadow-sm border border-gray-200 group hover:shadow-md transition-shadow cursor-pointer mb-2";
+                    el.innerHTML = `
+                        <div class="flex-1 overflow-hidden">
+                            <div class="font-bold text-gray-800 truncate">${data.name}</div>
+                            <div class="text-xs text-gray-500">${data.ingredients?.length || 0} ingr.</div>
+                        </div>
+                        <button class="delete-btn text-gray-300 hover:text-red-500 font-bold px-2">×</button>
+                    `;
+                    
+                    el.querySelector('.flex-1').onclick = () => loadRecipeToForm(data);
+                    el.querySelector('.delete-btn').onclick = (e) => window.deleteRecipe(docSnap.id, e);
+                    
+                    list.appendChild(el);
+                });
+            });
+        }
+
+        window.saveCurrentRecipe = async () => {
+            if (!currentUser) { alert("Debes iniciar sesión."); return; }
+            const name = document.getElementById('recipeName').value.trim();
+            if (!name) { showMsg("Falta el nombre de la receta"); return; }
+            const ings = getIngredients();
+            if (ings.length === 0) { showMsg("Añade ingredientes"); return; }
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'recetario-web';
+            const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'recipes');
+
+            try {
+                await addDoc(colRef, {
+                    name: name,
+                    baseServings: parseFloat(document.getElementById('baseServings').value) || 1,
+                    ingredients: ings,
+                    createdAt: new Date().toISOString()
+                });
+                showMsg("¡Guardada en tu cuaderno!");
+            } catch (e) {
+                console.error(e);
+                showMsg("Error al guardar: " + e.message);
+            }
+        };
+
+        window.deleteRecipe = async (id, e) => {
+            e.stopPropagation();
+            if(!confirm("¿Borrar esta receta?")) return;
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'recetario-web';
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'recipes', id));
+            } catch (e) { console.error(e); }
+        };
+
+        // --- LÓGICA UI ---
+        function loadRecipeToForm(data) {
+            document.getElementById('recipeName').value = data.name;
+            document.getElementById('baseServings').value = data.baseServings;
+            document.getElementById('ingredientsContainer').innerHTML = '';
+            if(data.ingredients) data.ingredients.forEach(i => window.addIngredientRow(i.name, i.quantity, i.unit));
+            document.getElementById('calculationResult').classList.add('hidden');
+        }
+
+        window.addIngredientRow = (name='', qty='', unit='') => {
+            const div = document.createElement('div');
+            div.className = "ingredient-row grid grid-cols-12 gap-2 items-end";
+            div.innerHTML = `
+                <div class="col-span-6"><input type="text" class="ing-name w-full placeholder-gray-400" placeholder="Ingrediente" value="${name}"></div>
+                <div class="col-span-3"><input type="number" class="ing-qty w-full text-center placeholder-gray-400" placeholder="Cant." value="${qty}"></div>
+                <div class="col-span-2"><input type="text" class="ing-unit w-full placeholder-gray-400" placeholder="Unidad" value="${unit}"></div>
+                <div class="col-span-1 text-center"><button onclick="this.parentElement.parentElement.remove()" class="text-red-400 font-bold">×</button></div>
+            `;
+            document.getElementById('ingredientsContainer').appendChild(div);
+        }
+
+        function getIngredients() {
+            return Array.from(document.querySelectorAll('.ingredient-row')).map(row => ({
+                name: row.querySelector('.ing-name').value,
+                quantity: parseFloat(row.querySelector('.ing-qty').value) || 0,
+                unit: row.querySelector('.ing-unit').value
+            })).filter(i => i.name || i.quantity > 0);
+        }
+
+        window.calculate = () => {
+            const base = parseFloat(document.getElementById('baseServings').value);
+            const target = parseFloat(document.getElementById('targetServings').value);
+            const ings = getIngredients();
+            if(!base || !target || ings.length === 0) { showMsg("Revisa los datos"); return; }
+            
+            const factor = target / base;
+            const ul = document.getElementById('resultList');
+            ul.innerHTML = '';
+            document.getElementById('resultTitle').textContent = `Para ${target} personas necesitas:`;
+            
+            ings.forEach(ing => {
+                let val = parseFloat((ing.quantity * factor).toFixed(2));
+                if(val % 1 === 0) val = parseInt(val);
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="font-bold text-indigo-900">${val} ${ing.unit}</span> ${ing.name}`;
+                ul.appendChild(li);
+            });
+            document.getElementById('calculationResult').classList.remove('hidden');
+            document.getElementById('calculationResult').scrollIntoView({behavior:'smooth'});
+        }
+
+        window.clearForm = () => {
+            document.getElementById('recipeName').value = '';
+            document.getElementById('ingredientsContainer').innerHTML = '';
+            window.addIngredientRow(); window.addIngredientRow(); window.addIngredientRow();
+            document.getElementById('calculationResult').classList.add('hidden');
+            document.getElementById('resultadoIA').style.display = 'none';
+        }
+
+        function showMsg(txt) {
+            document.getElementById('messageText').textContent = txt;
+            document.getElementById('messageOverlay').classList.remove('hidden');
+        }
+
+        // Init
+        window.addIngredientRow(); window.addIngredientRow(); window.addIngredientRow();
+    </script>
+
+    <script type="module">
+        // Importación DIRECTA para mayor compatibilidad
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+        // API KEY DE GEMINI (Asegúrate que sea esta y no la de Firebase)
+        const API_KEY = "AIzaSyB4dm80jUYLPABDVkM6Bp2InJS5t-OjCx8"; 
+        const genAI = new GoogleGenerativeAI(API_KEY);
+
+        // Referencias
+        const btnIA = document.getElementById('btnIA');
+        const resultadoIA = document.getElementById('resultadoIA');
+        const listaPasos = document.getElementById('listaPasos');
+        const contenedorTips = document.getElementById('contenedorTips');
+
+        btnIA.addEventListener('click', async () => {
+            // Feedback Visual
+            const textoOriginal = btnIA.textContent;
+            btnIA.textContent = "🍳 El Chef está pensando...";
+            btnIA.disabled = true;
+            btnIA.style.opacity = "0.7";
+
+            // Recolectar datos
+            const nombrePlato = document.getElementById('recipeName').value.trim() || "Plato Sorpresa";
+            
+            // Recolectar ingredientes de tus filas específicas
+            const filas = document.querySelectorAll('.ingredient-row');
+            let ingredientes = [];
+            
+            filas.forEach(fila => {
+                const n = fila.querySelector('.ing-name').value;
+                const c = fila.querySelector('.ing-qty').value;
+                const u = fila.querySelector('.ing-unit').value;
+                if(n) ingredientes.push(`${c} ${u} de ${n}`);
+            });
+
+            // Validación
+            if (ingredientes.length === 0) {
+                alert("¡Agrega al menos un ingrediente primero!");
+                btnIA.textContent = textoOriginal;
+                btnIA.disabled = false;
+                btnIA.style.opacity = "1";
+                return;
+            }
+
+            try {
+                // Preparar IA
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                
+                const prompt = `
+                    Actúa como un chef experto. Receta: "${nombrePlato}".
+                    Ingredientes: ${ingredientes.join(", ")}.
+                    Genera un JSON válido SIN markdown con: 
+                    { "pasos": ["paso 1", "paso 2"], "tips": [{"titulo": "x", "contenido": "y"}] }
+                `;
+
+                // Llamada a la API
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                let text = response.text();
+                
+                // Limpieza de respuesta
+                text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                const data = JSON.parse(text);
+
+                // Renderizar Pasos
+                listaPasos.innerHTML = "";
+                data.pasos.forEach(p => {
+                    const li = document.createElement('li');
+                    li.textContent = p;
+                    li.className = "mb-2 text-lg text-gray-700 font-serif";
+                    listaPasos.appendChild(li);
+                });
+
+                // Renderizar Tips
+                contenedorTips.innerHTML = "";
+                data.tips.forEach(t => {
+                    const div = document.createElement('div');
+                    div.className = "flex-shrink-0 w-64 p-4 rounded-lg shadow-md bg-yellow-50 border border-yellow-200";
+                    div.innerHTML = `
+                        <strong class="block text-red-500 mb-1">📌 ${t.titulo}</strong>
+                        <p class="text-sm text-gray-600">${t.contenido}</p>
+                    `;
+                    contenedorTips.appendChild(div);
+                });
+
+                // Mostrar
+                resultadoIA.style.display = 'block';
+                resultadoIA.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error("Error IA:", error);
+                alert("Hubo un error contactando al Chef. Revisa la consola.");
+            } finally {
+                btnIA.textContent = textoOriginal;
+                btnIA.disabled = false;
+                btnIA.style.opacity = "1";
+            }
+        });
+    </script>
+</body>
+</html>
