@@ -485,31 +485,27 @@
         window.addIngredientRow(); window.addIngredientRow(); window.addIngredientRow();
     </script>
 
-    <script type="module">
-        // Importación DIRECTA para mayor compatibilidad
+   <script type="module">
         import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
-        // API KEY DE GEMINI (Asegúrate que sea esta y no la de Firebase)
+        // TU API KEY DE GOOGLE AI STUDIO
         const API_KEY = "AIzaSyCyuzreknj_R9yceFWDFuEevOnzu97h-BM"; 
+        
         const genAI = new GoogleGenerativeAI(API_KEY);
 
-        // Referencias
         const btnIA = document.getElementById('btnIA');
         const resultadoIA = document.getElementById('resultadoIA');
         const listaPasos = document.getElementById('listaPasos');
         const contenedorTips = document.getElementById('contenedorTips');
 
         btnIA.addEventListener('click', async () => {
-            // Feedback Visual
             const textoOriginal = btnIA.textContent;
             btnIA.textContent = "🍳 El Chef está pensando...";
             btnIA.disabled = true;
             btnIA.style.opacity = "0.7";
 
-            // Recolectar datos
             const nombrePlato = document.getElementById('recipeName').value.trim() || "Plato Sorpresa";
             
-            // Recolectar ingredientes de tus filas específicas
             const filas = document.querySelectorAll('.ingredient-row');
             let ingredientes = [];
             
@@ -520,7 +516,6 @@
                 if(n) ingredientes.push(`${c} ${u} de ${n}`);
             });
 
-            // Validación
             if (ingredientes.length === 0) {
                 alert("¡Agrega al menos un ingrediente primero!");
                 btnIA.textContent = textoOriginal;
@@ -530,7 +525,7 @@
             }
 
             try {
-                // Preparar IA
+                // CAMBIO AQUÍ: Usamos 'gemini-pro' que es más estable
                 const model = genAI.getGenerativeModel({ model: "gemini-pro" });
                 
                 const prompt = `
@@ -540,16 +535,13 @@
                     { "pasos": ["paso 1", "paso 2"], "tips": [{"titulo": "x", "contenido": "y"}] }
                 `;
 
-                // Llamada a la API
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
                 let text = response.text();
                 
-                // Limpieza de respuesta
                 text = text.replace(/```json/g, "").replace(/```/g, "").trim();
                 const data = JSON.parse(text);
 
-                // Renderizar Pasos
                 listaPasos.innerHTML = "";
                 data.pasos.forEach(p => {
                     const li = document.createElement('li');
@@ -558,7 +550,6 @@
                     listaPasos.appendChild(li);
                 });
 
-                // Renderizar Tips
                 contenedorTips.innerHTML = "";
                 data.tips.forEach(t => {
                     const div = document.createElement('div');
@@ -570,7 +561,6 @@
                     contenedorTips.appendChild(div);
                 });
 
-                // Mostrar
                 resultadoIA.style.display = 'block';
                 resultadoIA.scrollIntoView({ behavior: 'smooth' });
 
