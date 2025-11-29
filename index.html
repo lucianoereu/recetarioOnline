@@ -1,154 +1,128 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Cuaderno de Recetas Online</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+<script type="module">
+  import { GoogleGenerativeAI } from "@google/generative-ai";
+
+  // 1. CONFIGURACIÓN
+  // Asegúrate de que esta API Key sea la de Google AI Studio (la que empieza con AIza...)
+  const API_KEY = "TU_API_KEY_DE_GEMINI_AQUI"; 
+  const genAI = new GoogleGenerativeAI(API_KEY);
+
+  // 2. REFERENCIAS AL DOM
+  const btnIA = document.getElementById('btnIA');
+  const resultadoIA = document.getElementById('resultadoIA');
+  const listaPasos = document.getElementById('listaPasos');
+  const contenedorTips = document.getElementById('contenedorTips');
+
+  // 3. FUNCIÓN PRINCIPAL
+  btnIA.addEventListener('click', async () => {
     
-    <style>
-        /* --- ESTILOS VISUALES --- */
-        body {
-            background-color: #333;
-            background-image: url('https://www.transparenttextures.com/patterns/wood-pattern.png');
-            font-family: 'Kalam', cursive;
-            display: flex;
-            justify-content: center;
-            padding: 20px;
-            min-height: 100vh;
-            color: #2d3748;
-        }
+    // A) Obtener Nombre del Plato (Usando tu ID correcto)
+    const nombrePlatoInput = document.getElementById('recipeName');
+    const nombrePlato = nombrePlatoInput.value.trim() || "Plato Sorpresa";
+    
+    // B) Recolectar Ingredientes (Usando tus clases específicas)
+    // Buscamos cada fila y extraemos nombre, cantidad y unidad
+    const filasIngredientes = document.querySelectorAll('.ingredient-row');
+    let listaIngredientes = [];
 
-        .notebook-sheet {
-            background-color: #fffef0;
-            width: 100%;
-            max-width: 900px;
-            min-height: 800px;
-            padding: 40px 40px 40px 60px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.3), 0 0 40px rgba(0,0,0,0.1) inset;
-            position: relative;
-            background-image: linear-gradient(#e2e2e2 1px, transparent 1px);
-            background-size: 100% 30px;
-            border-radius: 2px;
-        }
+    filasIngredientes.forEach(fila => {
+        const nombre = fila.querySelector('.ing-name').value.trim();
+        const cantidad = fila.querySelector('.ing-qty').value.trim();
+        const unidad = fila.querySelector('.ing-unit').value.trim();
 
-        .notebook-sheet::before {
-            content: '';
-            position: absolute;
-            top: 0; bottom: 0; left: 40px; width: 2px;
-            background-color: #ef4444; opacity: 0.6;
+        // Solo agregamos si tiene nombre
+        if(nombre) {
+            // Formato legible para la IA: "200 gr de Harina"
+            listaIngredientes.push(`${cantidad} ${unidad} de ${nombre}`);
         }
+    });
 
-        .notebook-sheet::after {
-            content: '';
-            position: absolute;
-            top: 40px; left: 15px; width: 15px; height: 15px;
-            background: #333; border-radius: 50%;
-            box-shadow: 0 300px 0 #333, 0 600px 0 #333;
-        }
+    if (listaIngredientes.length === 0) {
+        alert("¡Agrega al menos un ingrediente para que el chef pueda trabajar!");
+        return;
+    }
 
-        input, select {
-            background: transparent;
-            border: none;
-            border-bottom: 2px dashed #a0aec0;
-            font-family: 'Kalam', cursive;
-            font-size: 1.1rem;
-            color: #1a202c;
-            outline: none;
-            transition: border-color 0.2s;
-            padding: 0 5px;
-        }
+    // UI: Mostrar estado de carga
+    const textoOriginal = btnIA.textContent;
+    btnIA.textContent = "🍳 El Chef está pensando...";
+    btnIA.disabled = true;
+    btnIA.style.opacity = "0.7";
+    resultadoIA.style.display = 'none';
 
-        input:focus {
-            border-bottom: 2px solid #4a5568;
-            background-color: rgba(255, 255, 255, 0.4);
-        }
+    try {
+      // 4. PREPARAR EL MODELO
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        .btn-paper {
-            font-family: 'Kalam', cursive;
-            font-weight: 700;
-            border: 2px solid #2d3748;
-            background: white;
-            box-shadow: 3px 3px 0px rgba(0,0,0,0.2);
-            transform: rotate(-1deg);
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-
-        .btn-paper:hover {
-            transform: rotate(0deg) scale(1.02);
-            box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
-        }
+      const prompt = `
+        Actúa como un chef experto y amigable. 
+        Voy a cocinar: "${nombrePlato}".
         
-        .btn-paper:active {
-            transform: translateY(2px);
-            box-shadow: 0px 0px 0px rgba(0,0,0,0.2);
-        }
-
-        .saved-recipes-card {
-            background-color: #fff740;
-            transform: rotate(2deg);
-            box-shadow: 4px 4px 8px rgba(0,0,0,0.2);
-            border: none;
-        }
+        Tengo estos ingredientes exactos: 
+        ${listaIngredientes.join(", ")}.
         
-        /* Estilos para el Login */
-        .login-overlay {
-            background-color: rgba(0,0,0,0.6);
-            backdrop-filter: blur(2px);
-        }
-        
-        .google-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            background: white;
-            border: 1px solid #ddd;
-            padding: 10px 20px;
-            border-radius: 4px;
-            font-family: 'Inter', sans-serif;
-            font-weight: bold;
-            color: #444;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.2s;
-        }
-        .google-btn:hover {
-            background-color: #f8f8f8;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
-        }
+        Por favor genera:
+        1. Un procedimiento paso a paso numerado (lógico y claro).
+        2. Tres "secretos" o tips cortos (trucos de sabor, técnica o emplatado).
 
-        .user-chip {
-            background-color: #e2e8f0;
-            padding: 4px 12px;
-            border-radius: 999px;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #cbd5e0;
+        IMPORTANTE: Devuelve la respuesta SOLO en formato JSON puro, sin bloques de código markdown, con esta estructura exacta:
+        {
+          "pasos": ["Paso 1...", "Paso 2..."],
+          "tips": [
+            {"titulo": "TITULO CORTO", "contenido": "Consejo breve..."},
+            {"titulo": "TITULO CORTO", "contenido": "Consejo breve..."}
+          ]
         }
-    </style>
-</head>
-<body>
+      `;
 
-    <div class="notebook-sheet relative">
-        
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b-2 border-gray-300 pb-2">
-            <h1 class="text-4xl font-bold text-gray-800" style="text-decoration: underline; text-decoration-style: wavy; text-decoration-color: #ef4444;">
-                Mis Recetas
-            </h1>
-            
-            <div id="userSection" class="mt-2 md:mt-0 flex items-center gap-2 hidden">
-                <div class="user-chip">
-                    <span class="material-symbols-outlined text-gray-600 text-sm">person</span>
-                    <span id="userNameDisplay">Usuario</span>
-                </div>
-                <button onclick="window.logout()" class="text-xs text-red-500 hover:text-red-700 underline">Salir</button>
-            </div>
-            <button id="loginBtnTop" onclick="window.loginWithGoogle()" class="mt-2 md:mt-0 btn-paper px-4 py-1 text-sm bg-blue-50 text-blue-600 hidden">
-                Iniciar Sesión
-            </button>
-        </div>
+      // 5. LLAMADA A LA IA
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text();
+      
+      // Limpieza robusta del JSON (quita ```json y ```)
+      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      
+      const data = JSON.parse(text);
+
+      // 6. MOSTRAR RESULTADOS
+      // Limpiar anteriores
+      listaPasos.innerHTML = "";
+      contenedorTips.innerHTML = "";
+
+      // Renderizar Pasos
+      data.pasos.forEach(paso => {
+          const li = document.createElement('li');
+          li.textContent = paso;
+          li.className = "mb-2 text-gray-700 font-serif text-lg"; // Un poco de estilo Tailwind
+          listaPasos.appendChild(li);
+      });
+
+      // Renderizar Tips (Estilo Post-it mejorado)
+      data.tips.forEach(tip => {
+          const div = document.createElement('div');
+          // Estilos inline para asegurar que se vean bien las tarjetas
+          div.className = "flex-shrink-0 w-64 p-4 rounded-lg shadow-md transform hover:-translate-y-1 transition-transform duration-200";
+          div.style.backgroundColor = "#fffef0"; // Color papel
+          div.style.border = "1px solid #e2e8f0";
+          
+          div.innerHTML = `
+            <div class="font-bold text-red-500 mb-2 border-b border-red-200 pb-1">📌 ${tip.titulo}</div>
+            <p class="text-gray-600 text-sm leading-relaxed">${tip.contenido}</p>
+          `;
+          contenedorTips.appendChild(div);
+      });
+
+      resultadoIA.style.display = 'block';
+      // Auto-scroll suave hacia el resultado
+      resultadoIA.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    } catch (error) {
+      console.error("Error IA:", error);
+      alert("El chef tuvo un problema técnico. Revisa la consola (F12) para ver el detalle.");
+    } finally {
+      // Restaurar botón
+      btnIA.textContent = textoOriginal;
+      btnIA.disabled = false;
+      btnIA.style.opacity = "1";
+    }
+  });
+</script>
