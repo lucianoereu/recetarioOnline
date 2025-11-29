@@ -132,6 +132,13 @@
             border: 1px solid #cbd5e0;
         }
     </style>
+<script type="importmap">
+  {
+    "imports": {
+      "@google/generative-ai": "https://esm.run/@google/generative-ai"
+    }
+  }
+</script>
 </head>
 <body>
 
@@ -210,6 +217,22 @@
                         Nueva Hoja
                     </button>
                 </div>
+                <hr>
+                <!-- IA Section -->
+<div style="margin-top: 20px; text-align: center;">
+  <button id="btnIA" style="background-color: #6f42c1; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+    ✨ Generar Procedimiento y Tips con IA
+  </button>
+</div>
+
+<div id="resultadoIA" style="display: none; margin-top: 20px; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background: #f9f9f9;">
+  <h3 style="color: #333;">👨‍🍳 Procedimiento Sugerido:</h3>
+  <ol id="listaPasos" style="text-align: left; margin-bottom: 20px;"></ol>
+  
+  <h3 style="color: #333;">💡 Secretos del Chef:</h3>
+  <div id="contenedorTips" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px;">
+    </div>
+</div>
 
                 <!-- Resultados -->
                 <div id="calculationResult" class="hidden mt-6 p-6 bg-white border-2 border-gray-800 rounded-lg shadow-lg relative transform rotate-1">
@@ -283,14 +306,16 @@
         // 4. Copia el objeto 'firebaseConfig' y pégalo abajo reemplazando el existente.
         
         let firebaseConfig = {
-apiKey: "AIzaSyBOWnp0mhttmLzBzyA3_E3TlPBpW0SXNGY",
-  authDomain: "recetarioapp-bfef4.firebaseapp.com",
-  projectId: "recetarioapp-bfef4",
-  storageBucket: "recetarioapp-bfef4.firebasestorage.app",
-  messagingSenderId: "457281577350",
-  appId: "1:457281577350:web:96c37f7369334d44864c07",
-  measurementId: "G-CR481S5QNR"
+            apiKey: "AIzaSyBOWnp0mhttmLzBzyA3_E3TlPBpW0SXNGY",
+            authDomain: "recetarioapp-bfef4.firebaseapp.com",
+            projectId: "recetarioapp-bfef4",
+            storageBucket: "recetarioapp-bfef4.firebasestorage.app",
+            messagingSenderId: "457281577350",
+            appId: "1:457281577350:web:96c37f7369334d44864c07",
+            measurementId: "G-CR481S5QNR"
          };
+
+         
         // ==========================================
 
         // Detección automática para el entorno de prueba (No borrar)
@@ -513,5 +538,110 @@ apiKey: "AIzaSyBOWnp0mhttmLzBzyA3_E3TlPBpW0SXNGY",
         window.addIngredientRow(); window.addIngredientRow(); window.addIngredientRow();
 
     </script>
+    <!-- LÓGICA DE IA GENERATIVA -->
+     <script type="module">
+  import { GoogleGenerativeAI } from "@google/generative-ai";
+
+  // 1. CONFIGURACIÓN
+  const API_KEY = "AIzaSyB4dm80jUYLPABDVkM6Bp2InJS5t-OjCx8"; 
+  const genAI = new GoogleGenerativeAI(API_KEY);
+
+  // 2. REFERENCIAS AL DOM
+  const btnIA = document.getElementById('btnIA');
+  const resultadoIA = document.getElementById('resultadoIA');
+  const listaPasos = document.getElementById('listaPasos');
+  const contenedorTips = document.getElementById('contenedorTips');
+
+  // 3. FUNCIÓN PRINCIPAL
+  btnIA.addEventListener('click', async () => {
+    
+    // Obtener datos de la pantalla actual
+    // (Asumimos que tienes inputs con clase 'ingrediente' o similar, ajusta si es necesario)
+    // Aquí intento leer lo que el usuario escribió:
+    const nombrePlatoInput = document.querySelector('input[placeholder="Nombre del Plato"]'); 
+    // Nota: Ajusta el selector de arriba si tu input tiene otro ID o clase
+    
+    const nombrePlato = nombrePlatoInput ? nombrePlatoInput.value : "Plato Sorpresa";
+    
+    // Recolectar ingredientes (ajusta este selector según cómo hayas hecho tu lista)
+    const inputsIngredientes = document.querySelectorAll('input'); 
+    let ingredientes = [];
+    inputsIngredientes.forEach(inp => {
+        if(inp.value && inp.type === "text" && inp.placeholder !== "Nombre del Plato") {
+            ingredientes.push(inp.value);
+        }
+    });
+
+    if (ingredientes.length === 0) {
+        alert("¡Agrega al menos un ingrediente para que el chef pueda trabajar!");
+        return;
+    }
+
+    // UI: Mostrar cargando
+    btnIA.textContent = "🍳 Cocinando ideas...";
+    btnIA.disabled = true;
+    resultadoIA.style.display = 'none';
+
+    try {
+      // 4. PREPARAR EL MODELO
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      const prompt = `
+        Actúa como un chef experto. 
+        Plato: "${nombrePlato}".
+        Ingredientes disponibles: ${ingredientes.join(", ")}.
+        
+        Genera una respuesta SOLO en formato JSON válido con esta estructura:
+        {
+          "pasos": ["Paso 1 detallado", "Paso 2 detallado"],
+          "tips": [
+            {"titulo": "Truco", "contenido": "Texto breve"},
+            {"titulo": "Sabor", "contenido": "Texto breve"},
+            {"titulo": "Presentación", "contenido": "Texto breve"}
+          ]
+        }
+      `;
+
+      // 5. LLAMADA A LA IA
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text();
+      
+      // Limpiar formato JSON
+      text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const data = JSON.parse(text);
+
+      // 6. MOSTRAR RESULTADOS
+      // Limpiar anteriores
+      listaPasos.innerHTML = "";
+      contenedorTips.innerHTML = "";
+
+      // Renderizar Pasos
+      data.pasos.forEach(paso => {
+          const li = document.createElement('li');
+          li.textContent = paso;
+          li.style.marginBottom = "10px";
+          listaPasos.appendChild(li);
+      });
+
+      // Renderizar Tips (Estilo Tarjetas/Slides)
+      data.tips.forEach(tip => {
+          const div = document.createElement('div');
+          div.style = "min-width: 200px; background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeeba; color: #856404;";
+          div.innerHTML = `<strong>${tip.titulo}</strong><p style='margin: 5px 0 0 0; font-size: 0.9em;'>${tip.contenido}</p>`;
+          contenedorTips.appendChild(div);
+      });
+
+      resultadoIA.style.display = 'block';
+
+    } catch (error) {
+      console.error(error);
+      alert("El chef se quemó la mano (Hubo un error). Revisa la consola.");
+    } finally {
+      btnIA.textContent = "✨ Generar Procedimiento y Tips con IA";
+      btnIA.disabled = false;
+    }
+  });
+</script>
 </body>
 </html>
