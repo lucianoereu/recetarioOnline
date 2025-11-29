@@ -486,119 +486,103 @@
     </script>
 
   <script>
-        // --- CONFIGURACIÓN ---
-        // Pega aquí tu API Key de Google AI Studio (la que empieza con AIza...)
-        const API_KEY = "AIzaSyCyuzreknj_R9yceFWDFuEevOnzu97h-BM"; 
-        
-        // Usamos el modelo Flash que es rápido y barato. 
-        // Si este falla, prueba cambiarlo por "gemini-pro"
-        const MODELO = "gemini-1.5-flash"; 
-
-        // Referencias del HTML
         const btnIA = document.getElementById('btnIA');
-        const resultadoIA = document.getElementById('resultadoIA');
-        const listaPasos = document.getElementById('listaPasos');
-        const contenedorTips = document.getElementById('contenedorTips');
-
+        
         btnIA.addEventListener('click', async () => {
-            // 1. Efecto de "Pensando..."
-            const textoOriginal = btnIA.textContent;
-            btnIA.textContent = "🍳 Conectando con el Chef...";
-            btnIA.disabled = true;
-            btnIA.style.opacity = "0.7";
-
-            // 2. Recolectar datos del formulario
-            const nombrePlato = document.getElementById('recipeName').value.trim() || "Plato Sorpresa";
+            // ==========================================================
+            // 1. PEGA TU CLAVE NUEVA AQUÍ
+            // ==========================================================
+            const API_KEY = "AIzaSyCyuzreknj_R9yceFWDFuEevOnzu97h-BM"; 
             
-            const filas = document.querySelectorAll('.ingredient-row');
-            let ingredientes = [];
-            filas.forEach(fila => {
-                const n = fila.querySelector('.ing-name').value;
-                const c = fila.querySelector('.ing-qty').value;
-                const u = fila.querySelector('.ing-unit').value;
-                if(n) ingredientes.push(`${c} ${u} de ${n}`);
-            });
+            // 2. ¡ESTA ES LA MAGIA! Usamos el modelo que sí tienes en tu lista
+            const MODEL_NAME = "gemini-2.5-flash"; 
 
-            if (ingredientes.length === 0) {
-                alert("¡Agrega al menos un ingrediente primero!");
-                restaurarBoton(textoOriginal);
+            // Referencias
+            const resultadoIA = document.getElementById('resultadoIA');
+            const listaPasos = document.getElementById('listaPasos');
+            const contenedorTips = document.getElementById('contenedorTips');
+
+            // Validar
+            if (API_KEY.includes("PEGAR_TU_CLAVE")) {
+                alert("⚠️ Falta la API Key en el código.");
                 return;
             }
 
-            // 3. Preparar el mensaje para la IA
+            // UI Loading
+            const txtOriginal = btnIA.textContent;
+            btnIA.textContent = "🚀 El Chef del Futuro está pensando...";
+            btnIA.disabled = true;
+            btnIA.style.opacity = "0.7";
+
+            // Datos
+            const plato = document.getElementById('recipeName').value || "Algo rico";
+            const ings = Array.from(document.querySelectorAll('.ingredient-row')).map(r => {
+                const n = r.querySelector('.ing-name').value;
+                const q = r.querySelector('.ing-qty').value;
+                const u = r.querySelector('.ing-unit').value;
+                return n ? `${q} ${u} ${n}` : null;
+            }).filter(Boolean);
+
+            if (ings.length === 0) { 
+                alert("¡Pon al menos un ingrediente!"); 
+                btnIA.textContent=txtOriginal; btnIA.disabled=false; 
+                return; 
+            }
+
+            // Prompt
             const prompt = `
-                Actúa como un chef experto. Receta: "${nombrePlato}".
-                Ingredientes: ${ingredientes.join(", ")}.
+                Eres un chef experto. Receta: "${plato}". 
+                Ingredientes disponibles: ${ings.join(', ')}. 
                 
-                Instrucción vital: Responde ÚNICAMENTE con un JSON válido. No uses bloques de código markdown (\`\`\`json).
-                Estructura requerida:
-                { "pasos": ["paso 1", "paso 2"], "tips": [{"titulo": "x", "contenido": "y"}] }
+                Instrucción: Responde ÚNICAMENTE con un JSON válido (sin markdown).
+                Estructura: {"pasos": ["paso 1", "paso 2"], "tips": [{"titulo": "x", "contenido": "y"}]}
             `;
 
             try {
-                // 4. LLAMADA DIRECTA (Sin librerías)
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent?key=${API_KEY}`;
+                // LLAMADA DIRECTA
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
                 
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: prompt }]
-                        }]
-                    })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(`Error ${response.status}: ${errorData.error?.message || response.statusText}`);
+                    throw new Error(errorData.error?.message || response.statusText);
                 }
 
                 const data = await response.json();
                 
-                // 5. Procesar la respuesta
-                let text = data.candidates[0].content.parts[0].text;
+                // Procesar respuesta
+                let texto = data.candidates[0].content.parts[0].text;
+                // Limpiar JSON
+                texto = texto.replace(/```json/g, "").replace(/```/g, "").trim();
+                const json = JSON.parse(texto);
+
+                // Renderizar Pasos
+                listaPasos.innerHTML = json.pasos.map(p => `<li class="mb-3 text-lg text-gray-700 font-serif border-b border-gray-100 pb-2">${p}</li>`).join('');
                 
-                // Limpieza de formato (por si la IA pone ```json)
-                text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-                const receta = JSON.parse(text);
-
-                // 6. Mostrar en pantalla
-                listaPasos.innerHTML = "";
-                receta.pasos.forEach(p => {
-                    const li = document.createElement('li');
-                    li.textContent = p;
-                    li.className = "mb-2 text-lg text-gray-700 font-serif";
-                    listaPasos.appendChild(li);
-                });
-
-                contenedorTips.innerHTML = "";
-                receta.tips.forEach(t => {
-                    const div = document.createElement('div');
-                    div.className = "flex-shrink-0 w-64 p-4 rounded-lg shadow-md bg-yellow-50 border border-yellow-200";
-                    div.innerHTML = `
-                        <strong class="block text-red-500 mb-1">📌 ${t.titulo}</strong>
-                        <p class="text-sm text-gray-600">${t.contenido}</p>
-                    `;
-                    contenedorTips.appendChild(div);
-                });
-
+                // Renderizar Tips
+                contenedorTips.innerHTML = json.tips.map(t => `
+                    <div style="min-width: 220px; background: #fffbeb; padding: 15px; border: 1px solid #fcd34d; border-radius: 8px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05);">
+                        <div style="font-weight:bold; color:#b45309; margin-bottom:5px;">📌 ${t.titulo}</div>
+                        <p style="font-size:0.95rem; line-height:1.4;">${t.contenido}</p>
+                    </div>`).join('');
+                
                 resultadoIA.style.display = 'block';
                 resultadoIA.scrollIntoView({ behavior: 'smooth' });
 
-            } catch (error) {
-                console.error("Fallo detallado:", error);
-                alert(`Hubo un problema: ${error.message}. \n(Revisa que la API Key sea correcta y tenga saldo gratuito).`);
+            } catch (e) {
+                console.error(e);
+                alert("⚠️ Error: " + e.message);
             } finally {
-                restaurarBoton(textoOriginal);
+                btnIA.textContent = txtOriginal;
+                btnIA.disabled = false;
+                btnIA.style.opacity = "1";
             }
         });
-
-        function restaurarBoton(texto) {
-            btnIA.textContent = texto;
-            btnIA.disabled = false;
-            btnIA.style.opacity = "1";
-        }
     </script>
 </body>
 </html>
