@@ -283,14 +283,14 @@
         // 4. Copia el objeto 'firebaseConfig' y pégalo abajo reemplazando el existente.
         
         let firebaseConfig = {
-           apiKey: "AIzaSyBOWnp0mhttmLzBzyA3_E3TlPBpW0SXNGY",
-    authDomain: "recetarioapp-bfef4.firebaseapp.com",
-    projectId: "recetarioapp-bfef4",
-    storageBucket: "recetarioapp-bfef4.firebasestorage.app",
-    messagingSenderId: "457281577350",
-    appId: "1:457281577350:web:96c37f7369334d44864c07",
-    measurementId: "G-CR481S5QNR"
-        };
+            apiKey: "AIzaSyBOWnp0mhttmLzBzyA3_E3TlPBpW0SXNGY",
+            authDomain: "recetarioapp-bfef4.firebaseapp.com",
+            projectId: "recetarioapp-bfef4",
+            storageBucket: "recetarioapp-bfef4.firebasestorage.app",
+            messagingSenderId: "457281577350",
+            appId: "1:457281577350:web:96c37f7369334d44864c07",
+            measurementId: "G-CR481S5QNR"
+         };
         // ==========================================
 
         // Detección automática para el entorno de prueba (No borrar)
@@ -438,4 +438,80 @@
         window.deleteRecipe = async (id, e) => {
             e.stopPropagation();
             if(!confirm("¿Borrar esta receta?")) return;
-            const appId
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'recetario-web';
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'recipes', id));
+            } catch (e) { console.error(e); }
+        };
+
+        // --- LÓGICA UI ---
+        
+        function loadRecipeToForm(data) {
+            document.getElementById('recipeName').value = data.name;
+            document.getElementById('baseServings').value = data.baseServings;
+            document.getElementById('ingredientsContainer').innerHTML = '';
+            if(data.ingredients) data.ingredients.forEach(i => window.addIngredientRow(i.name, i.quantity, i.unit));
+            document.getElementById('calculationResult').classList.add('hidden');
+        }
+
+        window.addIngredientRow = (name='', qty='', unit='') => {
+            const div = document.createElement('div');
+            div.className = "ingredient-row grid grid-cols-12 gap-2 items-end";
+            div.innerHTML = `
+                <div class="col-span-6"><input type="text" class="ing-name w-full placeholder-gray-400" placeholder="Ingrediente" value="${name}"></div>
+                <div class="col-span-3"><input type="number" class="ing-qty w-full text-center placeholder-gray-400" placeholder="Cant." value="${qty}"></div>
+                <div class="col-span-2"><input type="text" class="ing-unit w-full placeholder-gray-400" placeholder="Unidad" value="${unit}"></div>
+                <div class="col-span-1 text-center"><button onclick="this.parentElement.parentElement.remove()" class="text-red-400 font-bold">×</button></div>
+            `;
+            document.getElementById('ingredientsContainer').appendChild(div);
+        }
+
+        function getIngredients() {
+            return Array.from(document.querySelectorAll('.ingredient-row')).map(row => ({
+                name: row.querySelector('.ing-name').value,
+                quantity: parseFloat(row.querySelector('.ing-qty').value) || 0,
+                unit: row.querySelector('.ing-unit').value
+            })).filter(i => i.name || i.quantity > 0);
+        }
+
+        window.calculate = () => {
+            const base = parseFloat(document.getElementById('baseServings').value);
+            const target = parseFloat(document.getElementById('targetServings').value);
+            const ings = getIngredients();
+            
+            if(!base || !target || ings.length === 0) { showMsg("Revisa los datos"); return; }
+            
+            const factor = target / base;
+            const ul = document.getElementById('resultList');
+            ul.innerHTML = '';
+            document.getElementById('resultTitle').textContent = `Para ${target} personas necesitas:`;
+            
+            ings.forEach(ing => {
+                let val = parseFloat((ing.quantity * factor).toFixed(2));
+                if(val % 1 === 0) val = parseInt(val);
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="font-bold text-indigo-900">${val} ${ing.unit}</span> ${ing.name}`;
+                ul.appendChild(li);
+            });
+            document.getElementById('calculationResult').classList.remove('hidden');
+            document.getElementById('calculationResult').scrollIntoView({behavior:'smooth'});
+        }
+
+        window.clearForm = () => {
+            document.getElementById('recipeName').value = '';
+            document.getElementById('ingredientsContainer').innerHTML = '';
+            window.addIngredientRow(); window.addIngredientRow(); window.addIngredientRow();
+            document.getElementById('calculationResult').classList.add('hidden');
+        }
+
+        function showMsg(txt) {
+            document.getElementById('messageText').textContent = txt;
+            document.getElementById('messageOverlay').classList.remove('hidden');
+        }
+
+        // Init
+        window.addIngredientRow(); window.addIngredientRow(); window.addIngredientRow();
+
+    </script>
+</body>
+</html>
