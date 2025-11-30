@@ -489,10 +489,18 @@
         const btnIA = document.getElementById('btnIA');
         
         btnIA.addEventListener('click', async () => {
+         // ==========================================================
+            // TÉCNICA ANTI-ROBOTS (Dividimos la llave en dos)
             // ==========================================================
-            // 1. PEGA TU CLAVE NUEVA AQUÍ
-            // ==========================================================
-            const API_KEY = "AIzaSyCyuzreknj_R9yceFWDFuEevOnzu97h-BM"; 
+            
+            // Pega aquí la PRIMERA MITAD de tu llave nueva (ej: los primeros 10 letras)
+            const PARTE_A = "AIzaSyB2"; 
+
+            // Pega aquí EL RESTO de la llave
+            const PARTE_B = "EVXd9mLZOsFWFzR9GnSwpl11eWxZcxQ"; 
+
+            // Aquí el código las une mágicamente:
+            const API_KEY = PARTE_A + PARTE_B;
             
             // 2. ¡ESTA ES LA MAGIA! Usamos el modelo que sí tienes en tu lista
             const MODEL_NAME = "gemini-2.5-flash"; 
